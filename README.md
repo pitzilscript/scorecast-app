@@ -31,8 +31,8 @@ Python · scikit-learn · pandas · Gradio
 ## Run locally
 
 ```bash
-git clone https://github.com/pitzilscript/scorecast.git
-cd scorecast
+git clone https://github.com/pitzilscript/scorecast-app.git
+cd scorecast-app
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 python3 app.py
