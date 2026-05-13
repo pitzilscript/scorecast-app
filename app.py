@@ -92,7 +92,7 @@ def prediction_html(team1, win1, draw, win2, team2):
         html += f"""
         <div style="display:flex;align-items:center;gap:14px;padding:11px 14px;
                     border-radius:8px;background:{row_bg};margin-bottom:5px;">
-          <div style="width:200px;font-size:1.05em;font-weight:{label_weight};
+          <div style="width:280px;min-width:280px;font-size:1.05em;font-weight:{label_weight};
                       color:{label_color};letter-spacing:1px;white-space:nowrap;
                       display:flex;align-items:center;">
             {label}{marker}
@@ -248,6 +248,10 @@ body, .gradio-container {
     min-height: 100vh;
     font-family: 'Inter', Arial, sans-serif !important;
 }
+.gradio-container > div {
+    max-width: 860px !important;
+    margin: 0 auto !important;
+}
 button[role="tab"] {
     color: #0d0d1a !important;
     font-family: 'Inter', sans-serif !important;
@@ -261,6 +265,10 @@ button[role="tab"] {
 button[role="tab"][aria-selected="true"] {
     background: #0d0d1a !important;
     color: white !important;
+}
+button[role="tab"][aria-selected="true"] {
+    border-bottom: 3px solid #27ae60 !important;
+    margin-bottom: -3px !important;
 }
 label span, .block label span {
     color: #0d0d1a !important;
