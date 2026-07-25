@@ -4,9 +4,22 @@ import numpy as np
 import joblib
 import json
 
+from scorecast_model import h2h_home_share, outcome_probs
+
 # Load model and supporting data
-model           = joblib.load('model.pkl')
-scaler          = joblib.load('scaler.pkl')
+bundle = joblib.load('model_bundle.pkl')
+poisson_home = bundle['poisson_home']
+poisson_away = bundle['poisson_away']
+scaler       = bundle['scaler']
+MODEL_FEATURES = bundle['features']
+
+with open('team_state.json') as f:
+    team_state = json.load(f)
+with open('h2h.json') as f:
+    h2h_store = json.load(f)
+
+DEFAULT_STATE = {'elo': 1500.0, 'form': 0.5, 'gf': 1.2, 'ga': 1.2}
+
 latest_rankings = pd.read_csv('latest_rankings.csv', index_col=0).squeeze()
 
 with open('name_map.json') as f:
@@ -22,9 +35,6 @@ results = results[results['date'] >= '1990-01-01'].sort_values('date').reset_ind
 results['result'] = 1
 results.loc[results['home_score'] > results['away_score'], 'result'] = 2
 results.loc[results['home_score'] < results['away_score'], 'result'] = 0
-
-FEATURES = ['home_form', 'away_form', 'form_diff', 'neutral', 'is_competitive',
-            'home_rank', 'away_rank', 'rank_diff']
 
 BALL_SVG = """<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
   style="display:inline-block;width:0.82em;height:0.82em;vertical-align:middle;margin:0 2px -6px 2px;">
@@ -125,13 +135,6 @@ def predict_and_explain(team1, team2, venue):
         home, away, neutral, swapped = team1, team2, 0, False
         venue_text = f"{team1} is playing at home"
 
-    h_r = name_map.get(home, home)
-    a_r = name_map.get(away, away)
-    h_form = get_team_form(home)
-    a_form = get_team_form(away)
-    h_rank = float(latest_rankings.get(h_r, 100))
-    a_rank = float(latest_rankings.get(a_r, 100))
-
     t1_form  = get_team_form(team1)
     t2_form  = get_team_form(team2)
     t1_rank  = float(latest_rankings.get(name_map.get(team1, team1), 100))
@@ -139,16 +142,22 @@ def predict_and_explain(team1, team2, venue):
     t1_last  = get_last_5(team1)
     t2_last  = get_last_5(team2)
 
-    X_pred = pd.DataFrame([[
-        h_form, a_form, h_form - a_form,
-        neutral, 1,
-        h_rank, a_rank, h_rank - a_rank
-    ]], columns=FEATURES)
-
+    hs = team_state.get(home, DEFAULT_STATE)
+    aw = team_state.get(away, DEFAULT_STATE)
+    feats = {
+        'elo_home': hs['elo'], 'elo_away': aw['elo'], 'elo_diff': hs['elo'] - aw['elo'],
+        'form_home': hs['form'], 'form_away': aw['form'],
+        'gf_home': hs['gf'], 'ga_home': hs['ga'], 'gf_away': aw['gf'], 'ga_away': aw['ga'],
+        'h2h_home': h2h_home_share(h2h_store, home, away),
+        'neutral': neutral, 'is_competitive': 1,
+    }
+    X_pred = pd.DataFrame([feats], columns=MODEL_FEATURES)
     X_scaled = scaler.transform(X_pred)
-    probs = model.predict_proba(X_scaled)[0]
-    t1_win, t2_win = (probs[0], probs[2]) if swapped else (probs[2], probs[0])
-    draw = probs[1]
+    mu_home = poisson_home.predict(X_scaled)[0]
+    mu_away = poisson_away.predict(X_scaled)[0]
+    _, (p_away, p_draw, p_home) = outcome_probs(mu_home, mu_away)
+    t1_win, t2_win = (p_away, p_home) if swapped else (p_home, p_away)
+    draw = p_draw
 
     pred = prediction_html(team1, float(t1_win), float(draw), float(t2_win), team2)
 
